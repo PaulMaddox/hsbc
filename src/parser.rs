@@ -1,7 +1,9 @@
 use crate::{Statement, Transaction};
 
 use flate2::read::DeflateDecoder;
+use nom::branch::*;
 use nom::bytes::complete::*;
+use nom::combinator::*;
 use nom::multi::*;
 use nom::sequence::*;
 use nom::IResult;
@@ -61,10 +63,10 @@ impl Parser {
 
 		// Now parse out the transactions from the decompressed streams
 		for stream in self.decompressed_streams.iter() {
-			let (_, transactions) = Parser::parse_transactions(&stream.bytes).unwrap();
-			statement.transactions.append(&mut transactions.clone());
+			if let Ok((_, transactions)) = Parser::parse_transactions(&stream.bytes) {
+				statement.transactions.append(&mut transactions.clone());
+			}
 		}
-
 		// ... and finally parse out the statement details (starting balance, closing balance etc)
 
 		Ok(statement)
@@ -81,13 +83,40 @@ impl Parser {
 		// (SUN AND SAND SPORTS ST DUBAI         AE)Tj 1 0 0 1 505.4 538.3 Tm
 		// (399.00)Tj 1 0 0 1 523.9 538.3 Tm
 
-		let (remaining, (_, encoded)) = tuple((take_until("TJ"), take_until("TJ")))(input)?;
+		// let (remaining, (_, encoded)) = tuple((take_until("TJ"), take_until("TJ")))(input)?;
+		// <match take_until("TJ")(input) {
+		// 	Ok((remaining, encoded)) => {
+		// 		println!(
+		// 			"\n\nFound a TJ with {} bytes remaining afterwards",
+		// 			remaining.len()
+		// 		);
+		// 		println!("Stream: {}", String::from_utf8_lossy(&encoded));
+		// 		Ok((remaining, Transaction::default()))
+		// 	}
+		// 	Err(e) => {
+		// 		println!("Error: {:#?}", e);
+		// 		Err(e)
+		// 	}
+		// }>
 
-		println!("--- TRANSACTION DATA ---");
-		println!("{} ", String::from_utf8_lossy(encoded));
-		println!("--- END TRANSACTION DATA ---");
+		// take(4usize)(input);
 
-		Ok((remaining, Transaction::default()))
+		let (remaining, (first, second, third)) =
+			tuple((take(1usize), take_until("TJ"), take(2usize)))(input)?;
+
+		println!("Remaining length of the input is {}", remaining.len());
+		println!("This first has {} bytes in it", first.len());
+		println!("This second has {} bytes in it", second.len());
+		println!("This third has {} bytes in it", third.len());
+
+		Ok((
+			remaining,
+			Transaction {
+				amount: 0u32,
+				date: 0u32,
+				details: String::from(String::from_utf8_lossy(second)),
+			},
+		))
 	}
 
 	fn parse_streams(input: &[u8]) -> IResult<&[u8], Vec<Stream>> {

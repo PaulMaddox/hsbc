@@ -1,6 +1,4 @@
-pub mod error;
 pub mod parser;
-pub mod pdf;
 
 #[derive(Clone, Default, Debug)]
 pub struct Statement {
@@ -25,7 +23,15 @@ mod tests {
         let file = std::fs::File::open("samples/august19.pdf").unwrap();
         let mut parser = crate::parser::Parser::new();
 
-        let statement = parser.parse(file).unwrap();
-        println!("{:#?}", statement);
+        match parser.parse(file) {
+            Ok(statement) => {
+                println!(
+                    "Statement contains {} transactions",
+                    statement.transactions.len()
+                );
+                println!("{:#?}", statement.transactions);
+            }
+            Err(e) => println!("Error: {:#?}", e),
+        }
     }
 }
