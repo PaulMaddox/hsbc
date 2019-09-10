@@ -3,7 +3,6 @@ use crate::{Statement, Transaction};
 use flate2::read::DeflateDecoder;
 use nom::branch::*;
 use nom::bytes::complete::*;
-use nom::character::complete::*;
 use nom::character::*;
 use nom::combinator::*;
 use nom::multi::*;
@@ -90,7 +89,7 @@ impl Parser {
 		let (remaining, (textbox, _)) = tuple((take_until("TJ"), take(2usize)))(input)?;
 		match Parser::parse_transaction(textbox) {
 			Ok((_, transaction)) => Ok((remaining, transaction)),
-			Err(_) => Ok((remaining, None)),
+			Err(e) => Err(e),
 		}
 	}
 
@@ -101,35 +100,30 @@ impl Parser {
 		// (SUN AND SAND SPORTS ST DUBAI         AE)Tj 1 0 0 1 505.4 538.3 Tm
 		// (399.00)Tj 1 0 0 1 523.9 538.3 Tm
 		let (remaining, found_transaction) = opt(tuple((
-			take_until("("),
-			take(1usize),
-			take_while(is_digit),
-			alt((
-				tag("JAN"),
-				tag("FEB"),
-				tag("MAR"),
-				tag("APR"),
-				tag("MAY"),
-				tag("JUN"),
-				tag("JUL"),
-				tag("AUG"),
-				tag("SEP"),
-				tag("OCT"),
-				tag("NOV"),
-				tag("DEC"),
-			)),
+			Parser::take_transaction_date,
+			Parser::take_transaction_date,
+			Parser::take_transaction_desc,
+			Parser::take_transaction_amnt,
 			// take_until(")"),
 			// take_while(Parser::is_alphanumeric_or_whitespace),
 			// take_until(")"),
 		)))(input)?;
 
 		match found_transaction {
-			Some((_, _, date, month)) => {
+			Some((
+				_,
+				(transaction_date, transaction_month),
+				transaction_desc,
+				(transaction_dirhams, transaction_fils),
+			)) => {
 				// We have a transaction
 				println!(
-					"We have a transaction posted on {} of {}",
-					String::from_utf8_lossy(date),
-					String::from_utf8_lossy(month)
+					"{}/{}: {} (amount: {}.{} AED)",
+					String::from_utf8_lossy(transaction_date),
+					String::from_utf8_lossy(transaction_month),
+					String::from_utf8_lossy(transaction_desc),
+					String::from_utf8_lossy(transaction_dirhams),
+					String::from_utf8_lossy(transaction_fils),
 				);
 
 				Ok((
@@ -144,6 +138,46 @@ impl Parser {
 			}
 			None => Ok((remaining, None)),
 		}
+	}
+
+	fn take_transaction_date(input: &[u8]) -> IResult<&[u8], (&[u8], &[u8])> {
+		let (remaining, _) = take_until("(")(input)?;
+		let (remaining, _) = tag("(")(remaining)?;
+		let (remaining, day) = take_while1(is_digit)(remaining)?;
+		let (remaining, month) = alt((
+			tag("JAN"),
+			tag("FEB"),
+			tag("MAR"),
+			tag("APR"),
+			tag("MAY"),
+			tag("JUN"),
+			tag("JUL"),
+			tag("AUG"),
+			tag("SEP"),
+			tag("OCT"),
+			tag("NOV"),
+			tag("DEC"),
+		))(remaining)?;
+		let (remaining, _) = tag(")")(remaining)?;
+		Ok((remaining, (day, month)))
+	}
+
+	fn take_transaction_desc(input: &[u8]) -> IResult<&[u8], &[u8]> {
+		let (remaining, _) = take_until("(")(input)?;
+		let (remaining, _) = tag("(")(remaining)?;
+		let (remaining, desc) = take_while1(Parser::is_alphanumeric_or_whitespace)(remaining)?;
+		let (remaining, _) = tag(")")(remaining)?;
+		Ok((remaining, desc))
+	}
+
+	fn take_transaction_amnt(input: &[u8]) -> IResult<&[u8], (&[u8], &[u8])> {
+		let (remaining, _) = take_until("(")(input)?;
+		let (remaining, _) = tag("(")(remaining)?;
+		let (remaining, dirhams) = take_while1(is_digit)(remaining)?;
+		let (remaining, _) = tag(".")(remaining)?;
+		let (remaining, fils) = take_while1(is_digit)(remaining)?;
+		let (remaining, _) = tag(")")(remaining)?;
+		Ok((remaining, (dirhams, fils)))
 	}
 
 	fn is_alphanumeric_or_whitespace(chr: u8) -> bool {

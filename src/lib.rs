@@ -20,7 +20,7 @@ pub struct Transaction {
 mod tests {
     #[test]
     fn parses_pdf() {
-        let file = std::fs::File::open("samples/august19.pdf").unwrap();
+        let file = std::fs::File::open("samples/july19.pdf").unwrap();
         let mut parser = crate::parser::Parser::new();
 
         match parser.parse(file) {
