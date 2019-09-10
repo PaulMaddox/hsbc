@@ -3,6 +3,8 @@ use crate::{Statement, Transaction};
 use flate2::read::DeflateDecoder;
 use nom::branch::*;
 use nom::bytes::complete::*;
+use nom::character::complete::*;
+use nom::character::*;
 use nom::combinator::*;
 use nom::multi::*;
 use nom::sequence::*;
@@ -63,8 +65,13 @@ impl Parser {
 
 		// Now parse out the transactions from the decompressed streams
 		for stream in self.decompressed_streams.iter() {
-			if let Ok((_, transactions)) = Parser::parse_transactions(&stream.bytes) {
-				statement.transactions.append(&mut transactions.clone());
+			if let Ok((_, (maybetransactions, _))) = Parser::parse_transactions(&stream.bytes) {
+				println!("MaybeTransactions: {:#?}", maybetransactions);
+				for maybetransaction in maybetransactions {
+					if let Some(transaction) = maybetransaction {
+						statement.transactions.push(transaction);
+					}
+				}
 			}
 		}
 		// ... and finally parse out the statement details (starting balance, closing balance etc)
@@ -72,51 +79,75 @@ impl Parser {
 		Ok(statement)
 	}
 
-	fn parse_transactions(input: &[u8]) -> IResult<&[u8], Vec<Transaction>> {
-		many0(Parser::parse_transaction)(input)
+	fn parse_transactions(input: &[u8]) -> IResult<&[u8], (Vec<Option<Transaction>>, &[u8])> {
+		many_till(
+			Parser::parse_textbox,
+			tag("Your specified account will be debited"),
+		)(input)
 	}
 
-	fn parse_transaction(input: &[u8]) -> IResult<&[u8], Transaction> {
+	fn parse_textbox(input: &[u8]) -> IResult<&[u8], Option<Transaction>> {
+		let (remaining, (textbox, _)) = tuple((take_until("TJ"), take(2usize)))(input)?;
+		match Parser::parse_transaction(textbox) {
+			Ok((_, transaction)) => Ok((remaining, transaction)),
+			Err(_) => Ok((remaining, None)),
+		}
+	}
+
+	fn parse_transaction(input: &[u8]) -> IResult<&[u8], Option<Transaction>> {
 		// [(  )] TJ 1 0 0 1 60.2 538.3 Tm
 		// (07AUG)Tj 1 0 0 1 110.6 538.3 Tm
 		// (06AUG)Tj 1 0 0 1 150.2 538.3 Tm
 		// (SUN AND SAND SPORTS ST DUBAI         AE)Tj 1 0 0 1 505.4 538.3 Tm
 		// (399.00)Tj 1 0 0 1 523.9 538.3 Tm
+		let (remaining, found_transaction) = opt(tuple((
+			take_until("("),
+			take(1usize),
+			take_while(is_digit),
+			alt((
+				tag("JAN"),
+				tag("FEB"),
+				tag("MAR"),
+				tag("APR"),
+				tag("MAY"),
+				tag("JUN"),
+				tag("JUL"),
+				tag("AUG"),
+				tag("SEP"),
+				tag("OCT"),
+				tag("NOV"),
+				tag("DEC"),
+			)),
+			// take_until(")"),
+			// take_while(Parser::is_alphanumeric_or_whitespace),
+			// take_until(")"),
+		)))(input)?;
 
-		// let (remaining, (_, encoded)) = tuple((take_until("TJ"), take_until("TJ")))(input)?;
-		// <match take_until("TJ")(input) {
-		// 	Ok((remaining, encoded)) => {
-		// 		println!(
-		// 			"\n\nFound a TJ with {} bytes remaining afterwards",
-		// 			remaining.len()
-		// 		);
-		// 		println!("Stream: {}", String::from_utf8_lossy(&encoded));
-		// 		Ok((remaining, Transaction::default()))
-		// 	}
-		// 	Err(e) => {
-		// 		println!("Error: {:#?}", e);
-		// 		Err(e)
-		// 	}
-		// }>
+		match found_transaction {
+			Some((_, _, date, month)) => {
+				// We have a transaction
+				println!(
+					"We have a transaction posted on {} of {}",
+					String::from_utf8_lossy(date),
+					String::from_utf8_lossy(month)
+				);
 
-		// take(4usize)(input);
+				Ok((
+					remaining,
+					Some(Transaction {
+						amount: 0u32,
+						date: 0u32,
+						details: String::from("test"),
+						// details: String::from(String::from_utf8_lossy(textbox)),
+					}),
+				))
+			}
+			None => Ok((remaining, None)),
+		}
+	}
 
-		let (remaining, (first, second, third)) =
-			tuple((take(1usize), take_until("TJ"), take(2usize)))(input)?;
-
-		println!("Remaining length of the input is {}", remaining.len());
-		println!("This first has {} bytes in it", first.len());
-		println!("This second has {} bytes in it", second.len());
-		println!("This third has {} bytes in it", third.len());
-
-		Ok((
-			remaining,
-			Transaction {
-				amount: 0u32,
-				date: 0u32,
-				details: String::from(String::from_utf8_lossy(second)),
-			},
-		))
+	fn is_alphanumeric_or_whitespace(chr: u8) -> bool {
+		is_alphanumeric(chr) || is_space(chr)
 	}
 
 	fn parse_streams(input: &[u8]) -> IResult<&[u8], Vec<Stream>> {

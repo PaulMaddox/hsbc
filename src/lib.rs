@@ -29,7 +29,7 @@ mod tests {
                     "Statement contains {} transactions",
                     statement.transactions.len()
                 );
-                println!("{:#?}", statement.transactions);
+                // println!("{:#?}", statement.transactions);
             }
             Err(e) => println!("Error: {:#?}", e),
         }
