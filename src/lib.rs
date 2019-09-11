@@ -3,7 +3,7 @@ pub mod parser;
 #[derive(Clone, Default, Debug)]
 pub struct Statement {
     name: String,
-    date: u32,
+    date: i64,
     opening_balance: f32,
     closing_balance: f32,
     transactions: Vec<Transaction>,
@@ -11,9 +11,9 @@ pub struct Statement {
 
 #[derive(Clone, Default, Debug)]
 pub struct Transaction {
-    date: u32,
+    date: i64,
     details: String,
-    amount: u32,
+    amount: f64,
 }
 
 #[cfg(test)]
@@ -24,13 +24,7 @@ mod tests {
         let mut parser = crate::parser::Parser::new();
 
         match parser.parse(file) {
-            Ok(statement) => {
-                println!(
-                    "Statement contains {} transactions",
-                    statement.transactions.len()
-                );
-                // println!("{:#?}", statement.transactions);
-            }
+            Ok(statement) => println!("{:#?}", statement),
             Err(e) => println!("Error: {:#?}", e),
         }
     }

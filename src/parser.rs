@@ -1,10 +1,10 @@
 use crate::{Statement, Transaction};
 
+use chrono::{DateTime, Datelike, NaiveDate, Utc};
 use flate2::read::DeflateDecoder;
 use nom::branch::*;
 use nom::bytes::complete::*;
 use nom::character::*;
-use nom::combinator::*;
 use nom::multi::*;
 use nom::sequence::*;
 use nom::IResult;
@@ -37,7 +37,9 @@ impl Parser {
 	where
 		R: Read,
 	{
+		// Create a new statement object to be appended to and returned
 		let mut statement = Statement::default();
+
 		// Read the binary PDF data from the reader
 		let mut data = Vec::new();
 		rdr.read_to_end(&mut data)?;
@@ -64,87 +66,68 @@ impl Parser {
 
 		// Now parse out the transactions from the decompressed streams
 		for stream in self.decompressed_streams.iter() {
-			if let Ok((_, (maybetransactions, _))) = Parser::parse_transactions(&stream.bytes) {
-				println!("MaybeTransactions: {:#?}", maybetransactions);
-				for maybetransaction in maybetransactions {
-					if let Some(transaction) = maybetransaction {
-						statement.transactions.push(transaction);
-					}
+			// Pass out the textboxes from the PDF
+			let (_, textboxes) = Parser::parse_textboxes(&stream.bytes).unwrap();
+			for textbox in textboxes.iter() {
+				// Does this textbox contain a statement overview?
+
+				// Does this textbox contain a transaction?
+				if let Ok((_, transaction)) = Parser::parse_transaction(textbox) {
+					statement.transactions.push(transaction);
 				}
 			}
 		}
-		// ... and finally parse out the statement details (starting balance, closing balance etc)
 
 		Ok(statement)
 	}
 
-	fn parse_transactions(input: &[u8]) -> IResult<&[u8], (Vec<Option<Transaction>>, &[u8])> {
-		many_till(
-			Parser::parse_textbox,
-			tag("Your specified account will be debited"),
-		)(input)
+	fn parse_textboxes(input: &[u8]) -> IResult<&[u8], Vec<&[u8]>> {
+		many0(Parser::parse_textbox)(input)
 	}
 
-	fn parse_textbox(input: &[u8]) -> IResult<&[u8], Option<Transaction>> {
-		let (remaining, (textbox, _)) = tuple((take_until("TJ"), take(2usize)))(input)?;
-		match Parser::parse_transaction(textbox) {
-			Ok((_, transaction)) => Ok((remaining, transaction)),
-			Err(e) => Err(e),
-		}
+	fn parse_textbox(input: &[u8]) -> IResult<&[u8], &[u8]> {
+		let (input, (textbox, _)) = tuple((take_until("TJ"), take(2usize)))(input)?;
+		Ok((input, textbox))
 	}
 
-	fn parse_transaction(input: &[u8]) -> IResult<&[u8], Option<Transaction>> {
-		// [(  )] TJ 1 0 0 1 60.2 538.3 Tm
-		// (07AUG)Tj 1 0 0 1 110.6 538.3 Tm
-		// (06AUG)Tj 1 0 0 1 150.2 538.3 Tm
-		// (SUN AND SAND SPORTS ST DUBAI         AE)Tj 1 0 0 1 505.4 538.3 Tm
-		// (399.00)Tj 1 0 0 1 523.9 538.3 Tm
-		let (remaining, found_transaction) = opt(tuple((
-			Parser::take_transaction_date,
-			Parser::take_transaction_date,
-			Parser::take_transaction_desc,
-			Parser::take_transaction_amnt,
-			// take_until(")"),
-			// take_while(Parser::is_alphanumeric_or_whitespace),
-			// take_until(")"),
-		)))(input)?;
+	fn parse_transaction(input: &[u8]) -> IResult<&[u8], Transaction> {
+		let (input, _) = Parser::take_transaction_date(input)?;
+		let (input, (transaction_date, transaction_month)) = Parser::take_transaction_date(input)?;
+		let (input, transaction_desc) = Parser::take_transaction_desc(input)?;
+		let (input, (transaction_dirhams, transaction_fils)) =
+			Parser::take_transaction_amnt(input)?;
 
-		match found_transaction {
-			Some((
-				_,
-				(transaction_date, transaction_month),
-				transaction_desc,
-				(transaction_dirhams, transaction_fils),
-			)) => {
-				// We have a transaction
-				println!(
-					"{}/{}: {} (amount: {}.{} AED)",
-					String::from_utf8_lossy(transaction_date),
-					String::from_utf8_lossy(transaction_month),
-					String::from_utf8_lossy(transaction_desc),
-					String::from_utf8_lossy(transaction_dirhams),
-					String::from_utf8_lossy(transaction_fils),
-				);
+		// Format the transaction date
+		let day = String::from_utf8_lossy(transaction_date);
+		let month = String::from_utf8_lossy(transaction_month);
+		let now: DateTime<Utc> = Utc::now();
+		let datestr = format!("{} {} {}", day, month, now.year());
+		let date = NaiveDate::parse_from_str(&datestr, "%d %b %Y")
+			.unwrap()
+			.and_hms(0, 0, 0);
 
-				Ok((
-					remaining,
-					Some(Transaction {
-						amount: 0u32,
-						date: 0u32,
-						details: String::from("test"),
-						// details: String::from(String::from_utf8_lossy(textbox)),
-					}),
-				))
-			}
-			None => Ok((remaining, None)),
-		}
+		// Format the transaction amount
+		let amount = format!(
+			"{}.{}",
+			String::from_utf8_lossy(transaction_dirhams),
+			String::from_utf8_lossy(transaction_fils)
+		);
+
+		Ok((
+			input,
+			Transaction {
+				amount: amount.parse().unwrap(),
+				date: date.timestamp(),
+				details: String::from_utf8_lossy(transaction_desc).to_string(),
+			},
+		))
 	}
 
 	fn take_transaction_date(input: &[u8]) -> IResult<&[u8], (&[u8], &[u8])> {
-		let (remaining, _) = take_until("(")(input)?;
-		let (remaining, _) = tag("(")(remaining)?;
-		let (remaining, day) = take_while1(is_digit)(remaining)?;
-		let (remaining, month) = alt((
+		let (input, _) = take_until("(")(input)?;
+		let (input, _) = tag("(")(input)?;
+		let (input, day) = take_while1(is_digit)(input)?;
+		let (input, month) = alt((
 			tag("JAN"),
 			tag("FEB"),
 			tag("MAR"),
@@ -157,27 +140,27 @@ impl Parser {
 			tag("OCT"),
 			tag("NOV"),
 			tag("DEC"),
-		))(remaining)?;
-		let (remaining, _) = tag(")")(remaining)?;
-		Ok((remaining, (day, month)))
+		))(input)?;
+		let (input, _) = tag(")")(input)?;
+		Ok((input, (day, month)))
 	}
 
 	fn take_transaction_desc(input: &[u8]) -> IResult<&[u8], &[u8]> {
-		let (remaining, _) = take_until("(")(input)?;
-		let (remaining, _) = tag("(")(remaining)?;
-		let (remaining, desc) = take_while1(Parser::is_alphanumeric_or_whitespace)(remaining)?;
-		let (remaining, _) = tag(")")(remaining)?;
-		Ok((remaining, desc))
+		let (input, _) = take_until("(")(input)?;
+		let (input, _) = tag("(")(input)?;
+		let (input, desc) = take_while1(Parser::is_alphanumeric_or_whitespace)(input)?;
+		let (input, _) = tag(")")(input)?;
+		Ok((input, desc))
 	}
 
 	fn take_transaction_amnt(input: &[u8]) -> IResult<&[u8], (&[u8], &[u8])> {
-		let (remaining, _) = take_until("(")(input)?;
-		let (remaining, _) = tag("(")(remaining)?;
-		let (remaining, dirhams) = take_while1(is_digit)(remaining)?;
-		let (remaining, _) = tag(".")(remaining)?;
-		let (remaining, fils) = take_while1(is_digit)(remaining)?;
-		let (remaining, _) = tag(")")(remaining)?;
-		Ok((remaining, (dirhams, fils)))
+		let (input, _) = take_until("(")(input)?;
+		let (input, _) = tag("(")(input)?;
+		let (input, dirhams) = take_while1(is_digit)(input)?;
+		let (input, _) = tag(".")(input)?;
+		let (input, fils) = take_while1(is_digit)(input)?;
+		let (input, _) = tag(")")(input)?;
+		Ok((input, (dirhams, fils)))
 	}
 
 	fn is_alphanumeric_or_whitespace(chr: u8) -> bool {
@@ -190,14 +173,14 @@ impl Parser {
 
 	fn parse_stream<'a>(input: &'a [u8]) -> IResult<&'a [u8], Stream> {
 		// Parse out the stream length
-		let (remaining, length) = Parser::parse_stream_length(input)?;
+		let (input, length) = Parser::parse_stream_length(input)?;
 
 		// Parse out the stream's binary data
-		let (remaining, (_, _, bytes)) =
-			tuple((take_until("stream\n"), take(7usize), take(length)))(remaining)?;
+		let (input, (_, _, bytes)) =
+			tuple((take_until("stream\n"), take(7usize), take(length)))(input)?;
 
 		Ok((
-			remaining,
+			input,
 			Stream {
 				bytes: bytes.to_vec(),
 			},
@@ -206,9 +189,9 @@ impl Parser {
 
 	fn parse_stream_length<'a>(input: &'a [u8]) -> IResult<&'a [u8], usize> {
 		match tuple((take_until("Length "), take(7usize), take_until("\n")))(input) {
-			Ok((remaining, (_, _, length_bytes))) => {
+			Ok((input, (_, _, length_bytes))) => {
 				let length = String::from_utf8_lossy(length_bytes);
-				Ok((remaining, length.parse().unwrap()))
+				Ok((input, length.parse().unwrap()))
 			}
 			Err(e) => Err(e),
 		}

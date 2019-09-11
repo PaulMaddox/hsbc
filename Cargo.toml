@@ -10,6 +10,7 @@ edition = "2018"
 nom = "5.0"
 flate2 = "1.0"
 hex = "0.3.2"
+chrono = "0.4"
 
 [lib]
 name = "libhsbc"
