@@ -20,11 +20,20 @@ pub struct Transaction {
 mod tests {
     #[test]
     fn parses_pdf() {
-        let file = std::fs::File::open("samples/july19.pdf").unwrap();
+        let file = std::fs::File::open("samples/september19.pdf").unwrap();
         let mut parser = crate::parser::Parser::new();
 
         match parser.parse(file) {
-            Ok(statement) => println!("{:#?}", statement),
+            Ok(statement) => {
+                println!("{:#?}", statement);
+                println!("\n\n\nFound {} transactions", statement.transactions.len());
+                let total = statement
+                    .transactions
+                    .iter()
+                    .fold(0f64, |sum, t| sum + t.amount);
+                println!("Total spend: {:.2}\n", total);
+                println!("First Transaction: {:#?}", statement.transactions[0]);
+            }
             Err(e) => println!("Error: {:#?}", e),
         }
     }

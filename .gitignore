@@ -11,3 +11,4 @@ Cargo.lock
 
 # Sample PDF statements
 samples/*pdf
+samples/*txt
