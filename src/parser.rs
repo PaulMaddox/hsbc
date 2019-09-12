@@ -1,7 +1,7 @@
-use crate::{Statement, Transaction};
+use super::statement::Statement;
+use super::transaction::Transaction;
 
 use chrono::{DateTime, Datelike, NaiveDate, Utc};
-use rust_decimal::Decimal;
 use flate2::read::DeflateDecoder;
 use nom::branch::*;
 use nom::bytes::complete::*;
@@ -10,6 +10,7 @@ use nom::combinator::*;
 use nom::multi::*;
 use nom::sequence::*;
 use nom::IResult;
+use rust_decimal::Decimal;
 use std::io::prelude::*;
 use std::str::*;
 
@@ -156,7 +157,6 @@ impl Parser {
 
         Ok((input, (total_credits, total_debits)))
     }
-    
     fn parse_transaction(input: &[u8]) -> IResult<&[u8], (bool, Transaction)> {
         // (24AUG)Tj 1 0 0 1 109.9 324.4 Tm
         // (22AUG)Tj 1 0 0 1 149.5 324.4 Tm
@@ -196,6 +196,9 @@ impl Parser {
             transaction_amnt = ta;
         }
 
+        // Clean the merchant up (remove location etc)
+        let details = Parser::clean_merchant_details(transaction_desc);
+
         // Format the transaction date
         let day = String::from_utf8_lossy(transaction_date);
         let month = String::from_utf8_lossy(transaction_month);
@@ -205,17 +208,16 @@ impl Parser {
             .unwrap()
             .and_hms(0, 0, 0);
 
-        Ok((
-            input,
-            (
-                credit.is_some(),
-                Transaction {
-                    amount: transaction_amnt,
-                    date: date.timestamp(),
-                    details: String::from_utf8_lossy(transaction_desc).to_string(),
-                },
-            ),
-        ))
+        let mut transaction = Transaction {
+            id: None,
+            amount: transaction_amnt,
+            date: date.timestamp(),
+            details,
+            category: None,
+        };
+        transaction.id = Some(transaction.hash());
+
+        Ok((input, (credit.is_some(), transaction)))
     }
 
     fn format_amount(amount: (&[u8], &[u8])) -> Decimal {
@@ -223,7 +225,8 @@ impl Parser {
             "{}.{}",
             String::from_utf8_lossy(amount.0).replace(",", ""),
             String::from_utf8_lossy(amount.1)
-        )).unwrap()
+        ))
+        .unwrap()
     }
 
     fn take_transaction_date(input: &[u8]) -> IResult<&[u8], (&[u8], &[u8])> {
@@ -320,5 +323,10 @@ impl Parser {
             }
             Err(e) => Err(e),
         }
+    }
+
+    fn clean_merchant_details(input: &[u8]) -> String {
+        let merchant = String::from_utf8_lossy(input).to_string();
+        String::from(merchant.split("  ").collect::<Vec<&str>>()[0])
     }
 }
