@@ -23,6 +23,20 @@ Options:
   --version                         Show version.
 ```
 
+## Installation / Build Instructions
+
+Prerequisite: You will need to have Rust installed to build this from source.
+It's easy to install from [https://rustup.rs](https://rustup.rs).
+
+Once you have rust installed...
+
+```
+$ git clone https://github.com/paulmaddox/hsbc.git
+$ cd hsbc
+$ cargo build --release
+$ cp ./target/release/hsbc /usr/local/bin
+```
+
 ## Examples (all values redacted with 0.00)
 
 ### Basic overview without categories
