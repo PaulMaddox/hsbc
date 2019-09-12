@@ -8,7 +8,7 @@ mod tests {
     #[test]
     fn parses_pdf() {
         let file = std::fs::File::open("samples/september19.pdf").unwrap();
-        let mut parser = crate::parser::Parser::new();
+        let mut parser = crate::parser::Parser::new(Vec::new());
 
         match parser.parse(file) {
             Ok(statement) => {

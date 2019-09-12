@@ -9,7 +9,7 @@ pub struct Transaction {
     pub date: i64,
     pub details: String,
     pub amount: Decimal,
-    pub category: Option<String>,
+    pub category: String,
 }
 
 impl Transaction {

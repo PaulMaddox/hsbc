@@ -1,3 +1,4 @@
+use super::category::{Category, UNKNOWN_CATEGORY};
 use super::statement::Statement;
 use super::transaction::Transaction;
 
@@ -16,6 +17,7 @@ use std::str::*;
 
 #[derive(Clone, Default, Debug)]
 pub struct Parser {
+    categories: Vec<Category>,
     compressed_streams: Vec<Stream>,
     decompressed_streams: Vec<Stream>,
     transactions: Vec<Transaction>,
@@ -28,8 +30,9 @@ struct Stream {
 }
 
 impl Parser {
-    pub fn new() -> Self {
+    pub fn new(categories: Vec<Category>) -> Self {
         Parser {
+            categories,
             compressed_streams: Vec::new(),
             decompressed_streams: Vec::new(),
             transactions: Vec::new(),
@@ -69,9 +72,9 @@ impl Parser {
         }
 
         // Now parse out the transactions from the decompressed streams
-        for (i, stream) in self.decompressed_streams.iter().enumerate() {
+        for stream in self.decompressed_streams.iter() {
             Parser::search_for_statement_summary(&stream.bytes, &mut statement);
-            Parser::search_for_transactions(&stream.bytes, &mut statement);
+            Parser::search_for_transactions(&self, &stream.bytes, &mut statement);
         }
 
         Ok(statement)
@@ -109,7 +112,7 @@ impl Parser {
         }
     }
 
-    fn search_for_transactions(input: &[u8], statement: &mut Statement) {
+    fn search_for_transactions(&self, input: &[u8], statement: &mut Statement) {
         let mut bytes = input.to_vec();
 
         loop {
@@ -118,7 +121,7 @@ impl Parser {
                 break;
             }
 
-            match Parser::parse_transaction(&bytes) {
+            match self.parse_transaction(&bytes) {
                 Ok((remaining, (is_credit, transaction))) => {
                     if is_credit {
                         statement.credits.push(transaction);
@@ -157,7 +160,8 @@ impl Parser {
 
         Ok((input, (total_credits, total_debits)))
     }
-    fn parse_transaction(input: &[u8]) -> IResult<&[u8], (bool, Transaction)> {
+
+    fn parse_transaction<'a>(&self, input: &'a [u8]) -> IResult<&'a [u8], (bool, Transaction)> {
         // (24AUG)Tj 1 0 0 1 109.9 324.4 Tm
         // (22AUG)Tj 1 0 0 1 149.5 324.4 Tm
         // (NFC - \(AP-PAY\)-)Tj 1 0 0 1 199.9 324.4 Tm
@@ -208,13 +212,16 @@ impl Parser {
             .unwrap()
             .and_hms(0, 0, 0);
 
-        let mut transaction = Transaction {
-            id: None,
-            amount: transaction_amnt,
-            date: date.timestamp(),
-            details,
-            category: None,
-        };
+        let mut transaction = Transaction::default();
+
+        match self.categories.iter().find(|c| c.is_match(&details)) {
+            Some(c) => transaction.category = c.name.clone(),
+            None => transaction.category = UNKNOWN_CATEGORY.to_string(),
+        }
+
+        transaction.amount = transaction_amnt;
+        transaction.date = date.timestamp();
+        transaction.details = details;
         transaction.id = Some(transaction.hash());
 
         Ok((input, (credit.is_some(), transaction)))
