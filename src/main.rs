@@ -77,7 +77,9 @@ fn show_overview(
     );
     println!("Total Debits:     {}", statement.total_debits);
     println!("Total Credits:    {}\n", statement.total_credits);
-    statement.categories.sort_by(|a, b| a.name.cmp(&b.name));
+
+    statement.categories.sort_by(|a, b| b.debits.cmp(&a.debits));
+
     for category in &statement.categories {
         if category.name == UNKNOWN_CATEGORY {
             continue;
@@ -102,7 +104,12 @@ fn show_overview(
         let mut transactions = statement.get_debits_for_category(&category.name);
         transactions.sort_by(|a, b| b.amount.cmp(&a.amount));
         for transaction in transactions {
-            println!("{}    {}", &transaction.amount, &transaction.details);
+            println!(
+                "{} AED or {:.2} GBP - {}",
+                transaction.amount,
+                transaction.amount * Decimal::from_str("0.220260").unwrap(),
+                transaction.details
+            );
         }
     }
 
