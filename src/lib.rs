@@ -1,19 +1,39 @@
 pub mod parser;
 
+use rust_decimal::Decimal;
+
 #[derive(Clone, Default, Debug)]
 pub struct Statement {
     name: String,
     date: i64,
-    opening_balance: f32,
-    closing_balance: f32,
-    transactions: Vec<Transaction>,
+    total_credits: Decimal,
+    total_debits: Decimal,
+    opening_balance: Decimal,
+    closing_balance: Decimal,
+    credits: Vec<Transaction>,
+    debits: Vec<Transaction>,
 }
 
-#[derive(Clone, Default, Debug)]
+impl Statement {
+    // Validates that the sum of all credits/debits matches the statement summary
+    pub fn validate(&self) -> bool {
+        let total_credits = self
+            .credits
+            .iter()
+            .fold(Decimal::new(0, 2), |sum, t| sum + t.amount);
+        let total_debits = self
+            .debits
+            .iter()
+            .fold(Decimal::new(0, 2), |sum, t| sum + t.amount);
+        total_credits == self.total_credits && total_debits == self.total_debits
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct Transaction {
     date: i64,
     details: String,
-    amount: f64,
+    amount: Decimal,
 }
 
 #[cfg(test)]
@@ -25,15 +45,14 @@ mod tests {
 
         match parser.parse(file) {
             Ok(statement) => {
-                println!("{:#?}", statement);
-                println!("\n\n\nFound {} transactions", statement.transactions.len());
-                let total = statement
-                    .transactions
-                    .iter()
-                    .fold(0f64, |sum, t| sum + t.amount);
-                println!("Total spend: {:.2}\n", total);
-                println!("First Transaction: {:#?}", statement.transactions[0]);
+                // println!("{:#?}", statement);
+                println!(
+                    "\n\n\nFound {} transactions",
+                    statement.credits.len() + statement.debits.len()
+                );
+                println!("Statement reconciled: {}", statement.validate());
             }
+
             Err(e) => println!("Error: {:#?}", e),
         }
     }
