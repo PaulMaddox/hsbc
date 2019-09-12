@@ -1,0 +1,112 @@
+[
+  {
+    "name": "Bank Charges",
+    "patterns": [
+      "VAT ON",
+      "VAT REFUND",
+      "CASHBACK",
+      "FINANCE CHARGES",
+      "ATM CASH ADVANCE"
+    ]
+  },
+  {
+    "name": "Clothing",
+    "patterns": [
+      "NEXT RETAIL LTD",
+      "ACCESSORIZE",
+      "FOREVER 21",
+      "SUN AND SAND SPORTS"
+    ]
+  },
+  {
+    "name": "DIY",
+    "patterns": [
+      "Speedex International",
+      "ACE-"
+    ]
+  },
+  {
+    "name": "Dining (in)",
+    "patterns": [
+      "ZOMATO ORDER"
+    ]
+  },
+  {
+    "name": "Dining (out)",
+    "patterns": [
+      "RESTAURANT",
+      "STARBUCKS",
+      "COFFEE",
+      "COSTA",
+      "CAFE",
+    ]
+  },
+  {
+    "name": "Health",
+    "patterns": [
+      "PHARMACY"
+    ]
+  },
+  {
+    "name": "Recreation",
+    "patterns": [
+      "DECATHLON",
+      "YALLA BOWLING MICC",
+      "WOLFIS BIKE SHOP",
+      "CHEEKY MONKEYS",
+      "WARNER BROS. WORLD"
+    ]
+  },
+  {
+    "name": "Shopping (food & drink)",
+    "patterns": [
+      "Barracuda Beach Resort",
+      "DUBAI DUTY FREE",
+      "CARREFOUR",
+      "CHOITHRAM",
+      "PARK N SHOP",
+      "INSTASHOP"
+    ]
+  },
+  {
+    "name": "Shopping (misc)",
+    "patterns": [
+      "Amazon",
+      "CENTRE POINT",
+      "BORDERS"
+    ]
+  },
+  {
+    "name": "Transportation",
+    "patterns": [
+      "UBER",
+      "CAREEM",
+      "DUBAI TAXI",
+      "CAFU AE",
+      "CARHIRE",
+      "TAXI",
+      "TRANSPORT",
+      "THRIFTY"
+    ]
+  },
+  {
+    "name": "Travel",
+    "patterns": [
+      "EMIRATES",
+      "AIRPORT LOUNGE"
+    ]
+  },
+  {
+    "name": "Unknown",
+    "patterns": []
+  },
+  {
+    "name": "Utilities",
+    "patterns": [
+      "Smart Dubai Government Dubai",
+      "ETISALAT",
+      "VIRGIN MOBILE",
+      "Emicool"
+    ]
+  }
+]
