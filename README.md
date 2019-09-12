@@ -25,7 +25,7 @@ Options:
 
 ### Basic overview without categories
 
-The `hsbc overview <pdf>` command output will analye a statement, and output an overview of the total debits/credits, as well as a list of all transactions. 
+The `hsbc overview <pdf>` command output will analyze a statement, and output an overview of the total debits/credits, as well as a list of all transactions. 
 
 This is useful, but this CLI tool can be a lot smarter and categorize spends if you provide a JSON file with a list of categories, and the text patterns that should be used to match a transaction to a category. See the examples below for more...
 
