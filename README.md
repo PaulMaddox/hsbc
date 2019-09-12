@@ -4,6 +4,8 @@ This repository contains a library (libhsbc) and a CLI program (hsbc) for analyz
 
 It works with statements issued in the United Arab Emirates, and has not been tested with any other formats.
 
+Yes. I was very fed up that HSBC has no API, integration with third party spend analysis tools. And really, I just miss [Monzo](https://monzo.com). 
+
 ## Usage 
 
 ```
