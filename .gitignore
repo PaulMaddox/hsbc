@@ -12,3 +12,6 @@ Cargo.lock
 # Sample PDF statements
 samples/*pdf
 samples/*txt
+
+# Don't overwrite the sample categories
+categories.json
